@@ -1,0 +1,29 @@
+# ========== PYTHON (server) ==========
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.env
+.env.*
+
+# ========== NODE (client) ==========
+node_modules/
+.next/
+dist/
+.env.local
+.env.development
+.env.production
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+out/
+
+# ========== SYSTEM ==========
+.DS_Store
+Thumbs.db
+
+# ========== VSCODE ==========
+.vscode/
+
+# ========== GIT ==========
+.git/
