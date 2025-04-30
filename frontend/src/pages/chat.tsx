@@ -9,7 +9,6 @@ import { BsChatLeftText } from "react-icons/bs";
 import "../app/globals.css"; // Ensure you have Tailwind CSS set up
 // import Image from "next/image";
 
-
 const API_URL = "http://localhost:8000/api/auth";
 
 export default function Chat() {
@@ -20,7 +19,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   interface CustomWebSocket {
@@ -75,7 +74,38 @@ export default function Chat() {
       // Load chat history
       const loadMessages = async () => {
         const fetchedMessages = await chatService.getMessages(selectedUser.id);
-        setMessages(fetchedMessages);
+
+        // Process all messages to ensure consistent format
+        const processedMessages = fetchedMessages.map((message: Message) => {
+          // Try to parse content as JSON (for WebSocket messages)
+          let content = message.content;
+          let file_info = message.file_info;
+
+          try {
+            const parsed = JSON.parse(message.content);
+            if (typeof parsed === "object") {
+              content = parsed.content || message.content;
+              file_info = parsed.file_info || message.file_info;
+            }
+          } catch (e) {
+            // Not JSON, use as-is
+          }
+
+          return {
+            ...message,
+            content,
+            file_info: file_info
+              ? {
+                  id: file_info.id,
+                  filename: file_info.filename,
+                  size: file_info.size,
+                  uploaded_at: file_info.uploaded_at,
+                }
+              : undefined,
+          };
+        });
+
+        setMessages(processedMessages);
       };
 
       loadMessages();
@@ -84,7 +114,6 @@ export default function Chat() {
       if (wsRef.current) {
         wsRef.current.close();
       }
-
       wsRef.current = chatService.setupWebSocket(currentUser.id, (message) => {
         if (
           (message.sender_id === selectedUser.id &&
@@ -92,49 +121,86 @@ export default function Chat() {
           (message.sender_id === currentUser.id &&
             message.receiver_id === selectedUser.id)
         ) {
-          setMessages((prev) => [...prev, message]);
+          // Parse the message content
+          let content = message.content;
+          let file_info = message.file_info;
+
+          try {
+            const parsed = JSON.parse(message.content);
+            if (typeof parsed === "object") {
+              content = parsed.content || message.content;
+              file_info = parsed.file_info || message.file_info;
+            }
+          } catch (e) {
+            // Not JSON, use as-is
+          }
+
+          const processedMessage = {
+            ...message,
+            content,
+            file_info: file_info
+              ? {
+                  id: file_info.id,
+                  filename: file_info.filename,
+                  size: file_info.size,
+                  uploaded_at: file_info.uploaded_at,
+                }
+              : undefined,
+          };
+
+          setMessages((prev) => [...prev, processedMessage]);
         }
       });
     }
   }, [currentUser, selectedUser]);
 
   const handleSelectUser = (user: User) => {
-    console.log("Selected user:", user);
-    setSelectedFile(null); // Clear selected file when switching users
-    setNewMessage(""); // Clear the message input when switching users
-    setMessages([]); // Clear messages when switching users
-    setSelectedUser(null); // Reset selected user
-    setSelectedUser(user);
+    // Only reset if selecting a different user
+    if (selectedUser?.id !== user.id) {
+      console.log("Selected user:", user);
+      setSelectedFile(null);
+      setNewMessage("");
+      setMessages([]);
+      setSelectedUser(user);
+    }
+  };
+  // Add this useEffect to handle auto-scrolling
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, selectedUser]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
- // Update the handleSendMessage function to handle files
-const handleSendMessage = () => {
-  if ((!newMessage.trim() && !selectedFile) || !currentUser || !selectedUser) return;
+  // Update the handleSendMessage function to handle files
+  const handleSendMessage = () => {
+    if ((!newMessage.trim() && !selectedFile) || !currentUser || !selectedUser)
+      return;
 
-  if (wsRef.current) {
-    // If there's a message, send it
-    if (newMessage.trim()) {
-      wsRef.current.sendMessage(newMessage, selectedUser.id);
+    if (wsRef.current) {
+      // If there's a message, send it
+      if (newMessage.trim()) {
+        wsRef.current.sendMessage(newMessage, selectedUser.id);
 
-      const tempMessage: Message = {
-        id: Date.now(),
-        content: newMessage,
-        sender_id: currentUser.id,
-        receiver_id: selectedUser.id,
-        created_at: new Date().toISOString(),
-      };
+        const tempMessage: Message = {
+          id: Date.now(),
+          content: newMessage,
+          sender_id: currentUser.id,
+          receiver_id: selectedUser.id,
+          created_at: new Date().toISOString(),
+        };
 
-      setMessages((prev) => [...prev, tempMessage]);
-      setNewMessage("");
+        setMessages((prev) => [...prev, tempMessage]);
+        setNewMessage("");
+      }
+
+      // If there's a file, upload it
+      if (selectedFile) {
+        handleFileUpload();
+      }
     }
-
-    // If there's a file, upload it
-    if (selectedFile) {
-      handleFileUpload();
-    }
-  }
-};
-
+  };
 
   const handleLogout = () => {
     authService.logout();
@@ -148,32 +214,68 @@ const handleSendMessage = () => {
   };
 
   const handleFileUpload = async () => {
-    if (!selectedFile || !currentUser) return;
-    console.log("Uploading file:", selectedFile);
+    if (!selectedFile || !currentUser || !selectedUser) return;
+
     try {
-      if (selectedUser) {
-        await fileService.uploadFile(selectedFile, selectedUser.id);
+      const uploadedFile = await fileService.uploadFile(
+        selectedFile,
+        selectedUser.id
+      );
+
+      // Create a consistent message structure
+      const fileMessage = {
+        content: `File: ${selectedFile.name}`,
+        file_info: {
+          id: uploadedFile.id,
+          filename: selectedFile.name,
+          size: selectedFile.size,
+          uploaded_at: new Date().toISOString(),
+        },
+      };
+
+      // Message for sender
+      const senderMessage: Message = {
+        id: Date.now(),
+        content: `You sent a file: ${selectedFile.name}`,
+        sender_id: currentUser.id,
+        receiver_id: selectedUser.id,
+        created_at: new Date().toISOString(),
+        file_info: fileMessage.file_info,
+      };
+
+      // Message for receiver (sent via WebSocket)
+      const receiverMessage = {
+        ...senderMessage,
+        content: `Received a file: ${selectedFile.name}`,
+        // Send as stringified JSON to ensure consistent parsing
+        ws_message: JSON.stringify({
+          content: `Received a file: ${selectedFile.name}`,
+          file_info: fileMessage.file_info,
+        }),
+      };
+
+      // Add sender's message to local state
+      setMessages((prev) => [...prev, senderMessage]);
+
+      // Send receiver's message via WebSocket
+      if (wsRef.current) {
+        wsRef.current.sendMessage(receiverMessage.ws_message, selectedUser.id);
       }
-      // Optionally, you can fetch the uploaded file info here if needed
-      const fileInfo = await fileService.getUserFiles();
-      console.log("Uploaded file info:", fileInfo);
-    
-      // Notify in chat about the file upload
-      if (wsRef.current && selectedUser) {
-        const fileMessage = `I uploaded a file: ${selectedFile.name}`;
-        wsRef.current.sendMessage(fileMessage, selectedUser.id);
-    
-        // Clear file selection
-        setSelectedFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+
+      // Clear file selection
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
     } catch (error) {
       console.error("Error uploading file:", error);
     }
-    
-    };
+  };
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " bytes";
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+    else return (bytes / 1048576).toFixed(1) + " MB";
+  };
 
   if (!currentUser) {
     return (
@@ -301,78 +403,50 @@ const handleSendMessage = () => {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 p-4 overflow-y-auto bg-[url('/chat-background.png')] bg-opacity-5">
-              {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 mb-4 flex items-center justify-center">
-                    <BsChatLeftText size={24} />
+            <div
+              className="flex-1 p-4 overflow-y-auto bg-[url('/chat-background.png')] bg-opacity-5"
+              style={{ display: "flex", flexDirection: "column" }}
+            >
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {messages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                    <div className="w-16 h-16 rounded-full bg-gray-200 mb-4 flex items-center justify-center">
+                      <BsChatLeftText size={24} />
+                    </div>
+                    <p>No messages yet</p>
+                    <p className="text-sm mt-2">
+                      Start the conversation with {selectedUser.username}
+                    </p>
                   </div>
-                  <p>No messages yet</p>
-                  <p className="text-sm mt-2">
-                    Start the conversation with {selectedUser.username}
-                  </p>
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`mb-4 flex ${
-                      message.sender_id === currentUser.id
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    {message.sender_id !== currentUser.id && (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold mr-2 self-end">
-                        {selectedUser.username.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="max-w-[70%]">
-                      <div
-                        className={`px-4 py-2 rounded-2xl shadow-sm ${
-                          message.sender_id === currentUser.id
-                            ? "bg-gradient-to-r from-teal-400 to-blue-500 text-white rounded-tr-none"
-                            : "bg-white text-gray-800 rounded-tl-none"
-                        }`}
-                      >
-                        {message.file_info ? (
-                          <div className="file-attachment">
-                            <div className="flex items-center p-1 rounded-md bg-opacity-20 bg-white">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6 mr-2"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                              </svg>
-                              <div className="flex-1 min-w-0">
-                                <div className="truncate font-medium">
-                                  {message.file_info.filename}
-                                </div>
-                                <div className="text-xs opacity-80">
-                                  {(message.file_info.size / 1024).toFixed(1)}{" "}
-                                  KB
-                                </div>
-                              </div>
-                              <button
-                                onClick={() =>
-                                  fileService.downloadFile(
-                                    message.file_info!.id
-                                  )
-                                }
-                                className="ml-2 p-1.5 bg-opacity-30 bg-gray-200 hover:bg-opacity-50 rounded-full transition-all"
-                                title="Download file"
-                              >
+                ) : (
+                  messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`mb-4 flex ${
+                        message.sender_id === currentUser.id
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
+                    >
+                      {message.sender_id !== currentUser.id && (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold mr-2 self-end">
+                          {selectedUser.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="max-w-[70%]">
+                        <div
+                          className={`px-4 py-2 rounded-2xl shadow-sm ${
+                            message.sender_id === currentUser.id
+                              ? "bg-gradient-to-r from-teal-400 to-blue-500 text-white rounded-tr-none"
+                              : "bg-white text-gray-800 rounded-tl-none"
+                          }`}
+                        >
+                          {message.file_info ? (
+                            <div className="file-attachment">
+                              <div className="flex items-center p-2 rounded-md bg-opacity-2">
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
-                                  className="h-4 w-4"
+                                  className="h-6 w-6 mr-2"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -381,33 +455,74 @@ const handleSendMessage = () => {
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                     strokeWidth={2}
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                                   />
                                 </svg>
-                              </button>
+                                <div className="flex-1 min-w-0">
+                                  <div className="truncate font-medium">
+                                    {message.file_info.filename}
+                                  </div>
+                                  <div className="text-xs opacity-80">
+                                    {formatFileSize(message.file_info.size)}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    fileService.downloadFile(
+                                      message.file_info!.id,
+                                      message.file_info!.filename
+                                    );
+                                  }}
+                                  className="ml-2 p-1.5 bg-opacity-30 bg-gray-200 hover:bg-opacity-50 rounded-full transition-all"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                              <p className="mt-2 text-sm">
+                                {message.content.includes("file")
+                                  ? ""
+                                  : message.content}
+                              </p>
                             </div>
-                            <p className="mt-2">{message.content}</p>
-                          </div>
-                        ) : (
-                          <p>{message.content}</p>
-                        )}
+                          ) : (
+                            <p>{message.content}</p>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 ml-2">
+                          {new Date(message.created_at).toLocaleString(
+                            "en-US",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1 ml-2">
-                        {new Date(message.created_at).toLocaleString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
+                      {message.sender_id === currentUser.id && (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-teal-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold ml-2 self-end">
+                          {currentUser.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                    {message.sender_id === currentUser.id && (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-teal-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold ml-2 self-end">
-                        {currentUser.username.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
 
             {/* File upload UI */}
