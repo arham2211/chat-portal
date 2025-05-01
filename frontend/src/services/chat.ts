@@ -52,7 +52,7 @@ const chatService = {
     return response.data;
   },
 
-  setupWebSocket(userId: number, onMessage: (message: Message) => void) {
+  setupWebSocket(userId: number, onMessage: (message: Message) => void, onPresenceChange?: (userId: number, isOnline: boolean) => void) {
     const ws = new WebSocket(`ws://localhost:8000/api/chat/ws/${userId}`);
     
     ws.onopen = () => {
@@ -61,17 +61,26 @@ const chatService = {
     
     ws.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data);
-        // Ensure consistent message format
-        onMessage({
-          ...message,
-          file_info: message.file_info ? {
-            id: message.file_info.id,
-            filename: message.file_info.filename,
-            size: message.file_info.size,
-            uploaded_at: message.file_info.uploaded_at
-          } : undefined
-        });
+        const data = JSON.parse(event.data);
+        
+        if (data.type === "presence" && onPresenceChange) {
+          // Handle presence updates
+          onPresenceChange(data.user_id, data.is_online);
+        } else {
+          // Handle regular messages
+          const message = {
+            ...data,
+            created_at: data.created_at || new Date().toISOString(),
+            // Ensure file_info is properly structured if present
+            file_info: data.file_info ? {
+              id: data.file_info.id,
+              filename: data.file_info.filename,
+              size: data.file_info.size,
+              uploaded_at: data.file_info.uploaded_at
+            } : undefined
+          };
+          onMessage(message);
+        }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
       }
@@ -83,13 +92,14 @@ const chatService = {
     
     return {
       sendMessage: (content: string, receiverId: number, file_info?: FileInfo, groupId?: number) => {
-        // Send both content and file_info in a standardized format
-        ws.send(JSON.stringify({
-          content,
-          receiver_id: receiverId,
-          file_info,
-          group_id: groupId
-        }));
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            content,
+            receiver_id: receiverId,
+            file_info,
+            group_id: groupId
+          }));
+        }
       },
       close: () => ws.close()
     };

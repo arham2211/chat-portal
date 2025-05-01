@@ -13,9 +13,9 @@ interface User {
 export default function Files() {
   const router = useRouter();
   const [files, setFiles] = useState<FileInfo[]>([]);
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  // const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  // const [isUploading, setIsUploading] = useState(false);
+  // const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [storageUsed, setStorageUsed] = useState(0);
@@ -72,59 +72,59 @@ export default function Files() {
   };
 
   // Handle file selection (both drag-drop and input)
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>) => {
-    let selectedFiles: FileList | null = null;
+  // const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>) => {
+  //   let selectedFiles: FileList | null = null;
     
-    if ('dataTransfer' in event) {
-      // Drag and drop event
-      event.preventDefault();
-      selectedFiles = event.dataTransfer.files;
-    } else {
-      // File input event
-      selectedFiles = event.target.files;
-    }
+  //   if ('dataTransfer' in event) {
+  //     // Drag and drop event
+  //     event.preventDefault();
+  //     selectedFiles = event.dataTransfer.files;
+  //   } else {
+  //     // File input event
+  //     selectedFiles = event.target.files;
+  //   }
 
-    if (selectedFiles && selectedFiles.length > 0) {
-      const file = selectedFiles[0];
+  //   if (selectedFiles && selectedFiles.length > 0) {
+  //     const file = selectedFiles[0];
       
-      // Check file size (e.g., 50MB limit)
-      if (file.size > 50 * 1024 * 1024) {
-        setError('File size exceeds 50MB limit');
-        return;
-      }
+  //     // Check file size (e.g., 50MB limit)
+  //     if (file.size > 50 * 1024 * 1024) {
+  //       setError('File size exceeds 50MB limit');
+  //       return;
+  //     }
       
-      // Check storage limit
-      if (file.size + storageUsed > storageLimit) {
-        setError('Not enough storage space');
-        return;
-      }
+  //     // Check storage limit
+  //     if (file.size + storageUsed > storageLimit) {
+  //       setError('Not enough storage space');
+  //       return;
+  //     }
       
-      setFileToUpload(file);
-      setError("");
-    }
-  };
+  //     setFileToUpload(file);
+  //     setError("");
+  //   }
+  // };
 
-  // Handle file upload
-  const handleFileUpload = async () => {
-    if (!fileToUpload) return;
+  // // Handle file upload
+  // const handleFileUpload = async () => {
+  //   if (!fileToUpload) return;
     
-    setIsUploading(true);
-    setError("");
+  //   setIsUploading(true);
+  //   setError("");
     
-    try {
-      await fileService.uploadFile(fileToUpload);
-      setFileToUpload(null);
-      await loadFiles(); // Refresh the files list
-    } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail || "Error uploading file");
-      } else {
-        setError("Unexpected error occurred during file upload");
-      }
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  //   try {
+  //     await fileService.uploadFile(fileToUpload);
+  //     setFileToUpload(null);
+  //     await loadFiles(); // Refresh the files list
+  //   } catch (err: unknown) {
+  //     if (axios.isAxiosError(err)) {
+  //       setError(err.response?.data?.detail || "Error uploading file");
+  //     } else {
+  //       setError("Unexpected error occurred during file upload");
+  //     }
+  //   } finally {
+  //     setIsUploading(false);
+  //   }
+  // };
 
   // Handle file download
   const handleDownload = async (fileId: number, filename: string) => {
@@ -240,24 +240,6 @@ export default function Files() {
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div className="px-4 py-3 border-b">
-          <button 
-            onClick={() => document.getElementById('file-upload')?.click()}
-            className="w-full py-2 px-3 bg-gradient-to-r from-teal-400 to-blue-500 text-white rounded-lg flex items-center justify-center space-x-2 hover:from-teal-500 hover:to-blue-600 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <span>Upload File</span>
-          </button>
-          <input 
-            id="file-upload" 
-            type="file" 
-            onChange={handleFileSelect} 
-            className="hidden" 
-          />
-        </div>
       </div>
 
       {/* Main content */}
@@ -279,86 +261,6 @@ export default function Files() {
           </div>
         </div>
 
-        {/* Upload area */}
-        <div className="p-6 border-b">
-          {error && (
-            <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm">
-              {error}
-            </div>
-          )}
-          <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-            isDragging ? 'border-teal-400 bg-teal-50' : 'border-gray-300 hover:border-teal-400 hover:bg-teal-50'
-          }`}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => { 
-            e.preventDefault(); 
-            setIsDragging(false);
-            if (e.dataTransfer.files.length > 0) {
-              handleFileSelect(e);
-            }
-          }}
-          >
-            <div className="mx-auto w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center text-teal-500 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-700 mb-1">Drag and drop files here</h3>
-            <p className="text-sm text-gray-500 mb-4">or</p>
-            <button
-              onClick={() => document.getElementById('file-upload')?.click()}
-              className="px-4 py-2 bg-gradient-to-r from-teal-400 to-blue-500 text-white rounded-lg text-sm font-medium hover:from-teal-500 hover:to-blue-600 transition-colors"
-            >
-              Browse Files
-            </button>
-          </div>
-
-          {fileToUpload && (
-            <div className="mt-4 bg-gray-50 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center text-teal-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-700">{fileToUpload.name}</p>
-                  <p className="text-xs text-gray-500">{formatFileSize(fileToUpload.size)}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => setFileToUpload(null)}
-                  className="p-1 text-gray-400 hover:text-gray-600"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-                <button
-                  onClick={handleFileUpload}
-                  disabled={isUploading}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium flex items-center ${
-                    isUploading 
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                      : 'bg-teal-500 text-white hover:bg-teal-600'
-                  }`}
-                >
-                  {isUploading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Uploading...
-                    </>
-                  ) : 'Upload'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Files list */}
         <div className="flex-1 overflow-y-auto p-6">

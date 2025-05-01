@@ -12,6 +12,10 @@ import "../app/globals.css"; // Ensure you have Tailwind CSS set up
 
 const API_URL = "http://localhost:8000/api/auth";
 
+const formatMessageTime = (timestamp: string) => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 export default function Chat() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -20,7 +24,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
+  const [onlineStatus, setOnlineStatus] = useState<Record<number, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   interface CustomWebSocket {
@@ -151,9 +155,22 @@ export default function Chat() {
 
           setMessages((prev) => [...prev, processedMessage]);
         }
-      });
-    }
-  }, [currentUser, selectedUser]);
+      },(userId, isOnline) => {
+        setOnlineStatus(prev => ({
+          ...prev,
+          [userId]: isOnline
+        }));
+      }
+    );
+    
+    // Cleanup
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }
+}, [currentUser, selectedUser]);
 
   const handleSelectUser = (user: User) => {
     // Only reset if selecting a different user
@@ -163,6 +180,7 @@ export default function Chat() {
       setNewMessage("");
       setMessages([]);
       setSelectedUser(user);
+      fileService.setSelectedUserId(user.id);
     }
   };
   // Add this useEffect to handle auto-scrolling
@@ -346,40 +364,69 @@ export default function Chat() {
 
         {/* Users list */}
         <div className="flex-1 overflow-y-auto">
-          {users.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <BsChatLeftText size={40} className="mb-2 text-gray-300" />
-              <p className="text-sm">No conversations yet</p>
+        {users.length === 0 ? (
+  <div className="flex flex-col items-center justify-center h-full text-gray-500">
+    <BsChatLeftText size={40} className="mb-2 text-gray-300" />
+    <p className="text-sm">No conversations yet</p>
+  </div>
+) : (
+  users.map((user) => {
+    // Find all messages with this user
+    const userMessages = messages.filter(
+      msg => 
+        (msg.sender_id === user.id && msg.receiver_id === currentUser.id) ||
+        (msg.sender_id === currentUser.id && msg.receiver_id === user.id)
+    );
+    
+    // Get the latest message
+    const latestMessage = userMessages.length > 0 
+      ? userMessages.reduce((latest, current) => 
+          new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+        )
+      : null;
+
+    return (
+      <div
+        key={user.id}
+        onClick={() => handleSelectUser(user)}
+        className={`p-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
+          selectedUser?.id === user.id ? "bg-gray-100" : ""
+        }`}
+      >
+        <div className="flex items-center">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+              {user.username.charAt(0).toUpperCase()}
             </div>
-          ) : (
-            users.map((user) => (
-              <div
-                key={user.id}
-                onClick={() => handleSelectUser(user)}
-                className={`p-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${
-                  selectedUser?.id === user.id ? "bg-gray-100" : ""
-                }`}
-              >
-                <div className="flex items-center">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                    {user.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-800">
-                        {user.username}
-                      </h3>
-                      <span className="text-xs text-gray-400">12:34 PM</span>
-                    </div>
-                    <p className="text-sm text-gray-500 truncate">
-                      {/* Placeholder for last message */}
-                      Click to start chatting
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+            {/* Online status indicator */}
+            <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+              onlineStatus[user.id] ? 'bg-green-500' : 'bg-gray-400'
+            }`}></div>
+          </div>
+          <div className="ml-3 flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-800">
+                {user.username}
+              </h3>
+              {latestMessage && (
+                <span className="text-xs text-gray-400">
+                  {formatMessageTime(latestMessage.created_at)}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 truncate">
+              {latestMessage 
+                ? latestMessage.content.length > 30 
+                  ? `${latestMessage.content.substring(0, 30)}...` 
+                  : latestMessage.content
+                : 'Click to start chatting'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  })
+)}
         </div>
       </div>
 
@@ -398,8 +445,12 @@ export default function Chat() {
                     {selectedUser.username}
                   </h2>
                   <div className="flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
-                    <span className="text-xs text-gray-500">Online</span>
+                    <div className={`w-2 h-2 rounded-full ${
+        onlineStatus[selectedUser.id] ? 'bg-green-500' : 'bg-gray-400'
+      } mr-1`}></div>
+                    <span className="text-xs text-gray-500">
+                    {onlineStatus[selectedUser.id] ? 'Online' : 'Offline'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -436,7 +487,7 @@ export default function Chat() {
                       key={message.id}
                       className={`mb-4 flex ${
                         message.sender_id === currentUser.id
-                          ? "justify-end"
+                          ? "justify-end pr-2"
                           : "justify-start"
                       }`}
                     >

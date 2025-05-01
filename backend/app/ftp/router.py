@@ -64,6 +64,23 @@ def get_user_files(current_user: User = Depends(get_current_user), db: Session =
     ).all()
     return files
 
+# Add to your FastAPI backend
+@router.get("/files/{user_id}", response_model=List[FileOut])
+async def get_user_files(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    print("Current user ID:", current_user.id)
+    print("Requested user ID:", user_id)
+    files = db.query(FileModel).filter(
+        ((FileModel.uploaded_by == current_user.id) &
+        (FileModel.received_by == user_id)) |
+        ((FileModel.uploaded_by == user_id) &
+        (FileModel.received_by == current_user.id))
+    ).all()
+    return files
+
 
 @router.get("/download/{file_id}")
 def download_file(file_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

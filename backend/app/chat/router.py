@@ -33,12 +33,24 @@ class MessageOut(BaseModel):
         }
 
 active_connections: Dict[int, WebSocket] = {}
+online_users: Dict[int, bool] = {}
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int, db: Session = Depends(get_db)):
     await websocket.accept()
     active_connections[user_id] = websocket
-    
+    online_users[user_id] = True
+    # Notify all connected users about this user coming online
+    for connection_user_id, ws in active_connections.items():
+        if connection_user_id != user_id:
+            try:
+                await ws.send_text(json.dumps({
+                    "type": "presence",
+                    "user_id": user_id,
+                    "is_online": True
+                }))
+            except:
+                pass  # Skip if sending fails
     try:
         while True:
             data = await websocket.receive_text()
@@ -80,7 +92,21 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, db: Session = D
     
     except WebSocketDisconnect:
         if user_id in active_connections:
-            del active_connections[user_id] 
+            del active_connections[user_id]
+        if user_id in online_users:
+            online_users[user_id] = False
+        
+        # Notify all connected users about this user going offline
+        for connection_user_id, ws in active_connections.items():
+            if connection_user_id != user_id:
+                try:
+                    await ws.send_text(json.dumps({
+                        "type": "presence",
+                        "user_id": user_id,
+                        "is_online": False
+                    }))
+                except:
+                    pass  # Skip if sending fails
 
 @router.get("/messages/{user_id}", response_model=List[MessageOut])
 def get_direct_messages(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
