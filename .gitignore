@@ -27,3 +27,36 @@ Thumbs.db
 
 # ========== GIT ==========
 .git/
+*.orig
+*.swp
+*.swo
+*.swn
+*.swa
+
+
+__pycache__/
+*.py[cod]
+
+# Ignore environment files
+.env
+
+# Ignore virtual environment folders
+venv/
+env/
+
+# Ignore logs
+*.log
+
+# Ignore compiled C extensions
+*.so
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore FTP data and temporary files
+ftp_data/
+*.tmp
+
+# Ignore IDE-specific files (optional, based on your IDE)
+.vscode/
+.idea/
