@@ -33,16 +33,12 @@ Thumbs.db
 *.swn
 *.swa
 
+# Ignore FTP files
+ftp_data/
+ftp/
 
-__pycache__/
-*.py[cod]
-
-# Ignore environment files
-.env
-
-# Ignore virtual environment folders
-venv/
-env/
+# Ignore database files
+*.db
 
 # Ignore logs
 *.log
@@ -53,10 +49,13 @@ env/
 # Ignore macOS system files
 .DS_Store
 
-# Ignore FTP data and temporary files
-ftp_data/
+# Ignore virtual environment folders
+venv/
+env/
+
+# Ignore temporary files
 *.tmp
 
-# Ignore IDE-specific files (optional, based on your IDE)
+# Ignore IDE-specific files
 .vscode/
 .idea/

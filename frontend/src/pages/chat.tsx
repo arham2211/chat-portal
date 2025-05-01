@@ -4,8 +4,9 @@ import authService, { User } from "../services/auth";
 import chatService, { Message } from "../services/chat";
 import fileService from "../services/file";
 import axios from "axios";
-import { IoSend, IoLogOut, IoCloudUpload } from "react-icons/io5";
+import { IoSend, IoLogOut, IoCloudUpload, IoDocument } from "react-icons/io5";
 import { BsChatLeftText } from "react-icons/bs";
+
 import "../app/globals.css"; // Ensure you have Tailwind CSS set up
 // import Image from "next/image";
 
@@ -387,19 +388,30 @@ export default function Chat() {
         {selectedUser ? (
           <>
             {/* Chat header */}
-            <div className="p-4 bg-white shadow-sm flex items-center z-10">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                {selectedUser.username.charAt(0).toUpperCase()}
-              </div>
-              <div className="ml-3">
-                <h2 className="font-medium text-gray-800">
-                  {selectedUser.username}
-                </h2>
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
-                  <span className="text-xs text-gray-500">Online</span>
+            <div className="p-4 bg-white shadow-sm flex items-center z-10 justify-between">
+              <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                  {selectedUser.username.charAt(0).toUpperCase()}
+                </div>
+                <div className="ml-3">
+                  <h2 className="font-medium text-gray-800">
+                    {selectedUser.username}
+                  </h2>
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                    <span className="text-xs text-gray-500">Online</span>
+                  </div>
                 </div>
               </div>
+
+              {/* Add this button to access files */}
+              <button
+                onClick={() => router.push("/files")}
+                className="flex gap-3 p-2 text-gray-600 hover:text-teal-500 hover:bg-gray-100 rounded-full transition-colors"
+                title="Go to Files"
+              ><span className="font-medium text-gray-800">My Files</span>
+                <IoDocument size={20} />
+              </button>
             </div>
 
             {/* Messages */}

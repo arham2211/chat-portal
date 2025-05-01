@@ -24,6 +24,12 @@ const chatService = {
       throw new Error('User ID is required to fetch messages');
     }
     const response = await axios.get(`${API_URL}/chat/messages/${userId}`);
+    console.log("Response Data: ",response.data);
+    if (response.data.length === 0) {
+      console.warn('No messages found for this user');
+      return []; // Return an empty array instead of throwing an error
+    }
+
     return response.data.map((message: Omit<Message, 'file_info'> & { file_info?: Partial<FileInfo> }) => ({
       ...message,
       // Ensure file_info is properly structured if present

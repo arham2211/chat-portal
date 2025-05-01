@@ -100,7 +100,8 @@ def get_direct_messages(user_id: int, current_user: User = Depends(get_current_u
         ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
     ).order_by(Message.created_at).all()
     if not messages:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No messages found")
+        # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No messages found")
+        return []
 
     # Uncomment the following lines if you want to fetch messages for a group
     # if not db.query(Group).filter(Group.id == user_id).first():
