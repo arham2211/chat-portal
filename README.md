@@ -2,7 +2,7 @@
 
 A real-time chat application with integrated file transfer capabilities, built with Next.js (frontend) and FastAPI (backend) using WebSockets for real-time communication.
 
-![Chat Portal](screenshots/Chat.png)
+![Chat Portal](frontend/screenshots/Chat.png)
 
 ## 🌟 Features
 
