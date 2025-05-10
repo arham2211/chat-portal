@@ -103,7 +103,7 @@ A real-time chat application with integrated file transfer capabilities, built w
 
 **To start the backend:**
 
-   uvicorn app.main:app --reload --port 8000
+   uvicorn app.main:app --reload
 
 **To start the frontend:**
 
@@ -112,3 +112,14 @@ A real-time chat application with integrated file transfer capabilities, built w
 
 Access the application at [http://localhost:3000](http://localhost:3000)
 
+## 📸 Screenshots
+
+**File Transfer**  
+   ![File Transfer](frontend/screenshots/myFiles.png)
+## 🤝 Contributing
+
+1. Fork the repository  
+2. Create your feature branch with: `git checkout -b feature/your-feature`  
+3. Commit your changes with a message like: `git commit -m 'Add some feature'`  
+4. Push to the branch: `git push origin feature/your-feature`  
+5. Open a Pull Request
